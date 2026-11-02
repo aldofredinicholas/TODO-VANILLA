@@ -2,11 +2,20 @@ import "./style.css"
 
 /* ================= 1. STATO ================= */
 const CHIAVE = "todo-tasks"
+const CHIAVE_NOME = "todo-nome" 
 
 function caricaStato() {
   const testo = localStorage.getItem(CHIAVE)
   if (testo === null) return []
-  return JSON.parse(testo)
+
+  try {
+    const dati = JSON.parse(testo)
+    // difesa in più: deve essere proprio un array
+    return Array.isArray(dati) ? dati : []
+  } catch (errore) {
+    console.error("Dati salvati non validi, riparto da zero:", errore.message)
+    return []
+  }
 }
 
 let tasks = caricaStato()
@@ -16,7 +25,9 @@ const lista = document.querySelector("#lista")
 const info  = document.querySelector("#info")
 const form  = document.querySelector("#form-task")
 const campo = document.querySelector("#campo-task")
-
+const box   = document.querySelector("#benvenuto") 
+const messaggio = document.querySelector("#messaggio")
+const azioni    = document.querySelector("#azioni") 
 /* ================= 3. PERSISTENZA ================= */
 function salvaStato() {
   localStorage.setItem(CHIAVE, JSON.stringify(tasks))
@@ -35,30 +46,80 @@ function render() {
 
   const completati = tasks.filter(t => t.completed).length
   info.textContent = `Totali: ${tasks.length} · Completati: ${completati}`
+
+    azioni.innerHTML = completati > 0
+    ? `<button id="pulisci">Elimina completati (${completati})</button>`
+    : ""
+
+  const pulisci = document.querySelector("#pulisci")
+  if (pulisci) {
+    pulisci.addEventListener("click", deleteCompletati)
+  }
+
+
+  const totali = tasks.length
+  const restanti = totali - completati
+
+    let frase
+  if (totali === 0) {
+    frase = "Non hai task. Buona giornata."
+  } else if (restanti === 0) {
+    frase = "Fatto tutto. Complimenti."
+  } else {
+    frase = `Ti restano ${restanti} task su ${totali}.`
+  }
+
+  messaggio.textContent = frase
+}
+
+
+function renderBenvenuto() {
+  const nome = localStorage.getItem(CHIAVE_NOME)
+
+  if (nome) {
+    box.innerHTML = `<p>Bentornato, ${nome}</p>`
+    return
+  }
+
+  box.innerHTML = `
+    <input type="text" id="campo-nome" placeholder="Come ti chiami?">
+    <button id="salva-nome">Salva</button>
+  `
+
+  document.querySelector("#salva-nome").addEventListener("click", () => {
+    const valore = document.querySelector("#campo-nome").value.trim()
+    if (valore === "") return
+    localStorage.setItem(CHIAVE_NOME, valore)
+    renderBenvenuto() 
+  })
 }
 
 /* ================= 5. AZIONI ================= */
+function aggiornaStato(nuoviTasks) {
+  tasks = nuoviTasks
+  salvaStato()
+  render()
+}
+
 function addTask(title) {
   const pulito = title.trim()
   if (pulito === "") return
-
-  tasks = [...tasks, { id: Date.now(), title: pulito, completed: false }]
-  salvaStato()
-  render()
+  aggiornaStato([...tasks, { id: Date.now(), title: pulito, completed: false }])
 }
 
 function toggleTask(id) {
-  tasks = tasks.map(t =>
-    t.id === id ? { ...t, completed: !t.completed } : t
+  aggiornaStato(
+    tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
   )
-  salvaStato()
-  render()
 }
 
 function deleteTask(id) {
-  tasks = tasks.filter(t => t.id !== id)
-  salvaStato()
-  render()
+  aggiornaStato(tasks.filter(t => t.id !== id))
+}
+
+function deleteCompletati() {
+  if (!confirm("Elimino tutti i task completati?")) return
+  aggiornaStato(tasks.filter(t => !t.completed))
 }
 
 /* ================= 6. EVENTI ================= */
@@ -84,4 +145,5 @@ lista.addEventListener("click", (evento) => {
 })
 
 /* ================= 7. AVVIO ================= */
+renderBenvenuto() 
 render()
